@@ -38,10 +38,12 @@ python manage.py runserver <ip>:<port>
 ```json
 {
  "name": "Tanaka Taro",
- "inout": "in",
+ "inout": "in", 
  "time": "2024-01-01 09:30:00"
 }
 ```
+※inout: "in" or "out"
+
 
 ## 入退出情報の可視化
 
