@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'style.css' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>研究室入退出状況</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- <h1>研究室入退出状況</h1> -->
+        <h1 id="title">Access Monitor</h1>
+
+        <!-- タブ -->
+        <div class="tabbox">
+            <hr>
+            <input type="radio" name="tabset" id="tabcheck1" value="tab1"><label for="tabcheck1" class="tab">Status</label>
+            <input type="radio" name="tabset" id="tabcheck2" value="tab2"><label for="tabcheck2" class="tab">Monthly Graph</label>
+            <input type="radio" name="tabset" id="tabcheck3" value="tab3"><label for="tabcheck3" class="tab">Monthly Ranking</label>
+            <input type="radio" name="tabset" id="tabcheck4" value="tab4" ><label for="tabcheck4" class="tab">Search</label>
+
+<!-- 
+            <input type="radio" name="tabset" id="tabcheck1" value="tab1" {% if input == 'tab1' %} checked {% endif %}><label for="tabcheck1" class="tab">Status</label>
+            <input type="radio" name="tabset" id="tabcheck2" value="tab2" {% if select == 'tab2' %} checked {% endif %}       ><label for="tabcheck2" class="tab">Monthly Graph</label>
+            <input type="radio" name="tabset" id="tabcheck3" value="tab3" {% if select == 'tab3' %} checked {% endif %}       ><label for="tabcheck3" class="tab">Monthly Ranking</label>
+            <input type="radio" name="tabset" id="tabcheck4" value="tab4" {% if select == 'tab4' %} checked {% endif %}       ><label for="tabcheck4" class="tab">Search</label> -->
+            <hr>
+
+            <!-- 入退出状況タブの中身 -->
+            <div class="tabcontent" id="tabcontent1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>名前</th>
+                            <th>状況</th>
+                            <th>最終更新</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for member in members %}
+                        <tr>
+                            <td data-label="名前">{{ member.name }}</td>
+                            <td data-label="状況">
+                                <span class="status {% if member.is_present %}present{% else %}absent{% endif %}">
+                                    {% if member.is_present %}入室中{% else %}退出中{% endif %}
+                                </span>
+                            </td>
+                            <td data-label="最終更新">{{ member.last_active|date:"Y-m-d H:i:s" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 月間滞在時間タブの中身 -->
+            <div class="tabcontent" id="tabcontent2">
+                <!-- 2番目のファイルのグラフ描画機能を組み込み -->
+                <div class="chartWrapper">
+                    <div class="chart-container">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+                <div class="chartWrapper">
+                    <div class="chart-container">
+                        <canvas id="lineChart2"></canvas>
+                    </div>
+                </div>
+
+                <!-- メンバー情報のデータ要素 -->
+                <div id="total-count" title="{{ members|length }}"></div>
+                {% for member in members %}
+                    <div hidden id="name-{{ forloop.counter }}" title="{{ member.name }}"></div>
+                    <div hidden id="mtt-{{ forloop.counter }}" title="{{ member.monthly_total_time }}"></div>
+                    <div hidden id="mec-{{forloop.counter}}" title="{{member.monthly_entry_count}}"></div>
+                    <div hidden id="adt-{{forloop.counter}}" title="{{member.average_daily_time}}"></div>
+                {% endfor %}
+            </div>
+
+            <!-- ランキングタブの中身 -->
+            <div class="tabcontent" id="tabcontent3">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>順位</th>
+                            <th>名前</th>
+                            <th>滞在時間</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ranking-table">
+                        <!-- JavaScriptでデータ挿入 -->
+                    </tbody>
+                </table>
+
+                <!-- メンバー取得 -->
+                {% for member in members %}
+                    <div id="name-{{ forloop.counter }}" title="{{ member.name }}"></div>
+                    <div id="monthly_total_time-{{ forloop.counter }}" title="{{ member.monthly_total_time }}"></div>
+                {% endfor %}
+            </div>
+
+            <!-- searchタブの中身 -->
+            <div class="tabcontent" id="tabcontent4">
+                <!-- form -->
+                <div>
+                    <form id="myForm" class="search-form" action='' method='post'>
+                        {% csrf_token %}
+                        <div   class="search-box">
+                        <input type='text' name='input' placeholder="Search"id="search" autocomplete="off"/>
+                        <input type='text' name='year_search' placeholder="Year" id="year_search" autocomplete="off"/>
+                        <input type='text' name='month_search' placeholder="Month" id="month_search" autocomplete="off"/>
+                        <button type="submit" id="submit_btn"><i class="fa fa-search"></i></button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 検索結果 -->
+                {% if input%}
+                    <h2 id="input_name">{{ input }}　さんの記録</h2>
+                    {% if year and month %}
+                        <h2>{{ year }} / {{ month }}</h2>
+                    {% endif %}
+                    
+                    <div class = "record">
+                        <table class="record_table">
+                            <tbody>
+                                <!-- 名前が存在していた場合 -->
+                                {% if member_record %}
+                                <tr>
+                                    <td>今月の滞在時間</td>
+                                    <td>{{ total_time }}</td>
+                                </tr><tr>
+                                    <td>今月の入室日数</td>
+                                    <td>{{ entry }}</td>
+                                </tr><tr>
+                                    <td>今月の平均滞在時間</td>
+                                    <td>{{ ave_time }}</td>
+                                </tr>
+                                
+                                <!-- 存在していない場合 -->
+                                {% else %}
+                                    <tr>
+                                        <td>今月の滞在時間</td>
+                                        <td></td>
+                                    </tr><tr>
+                                        <td>今月の入室日数</td>
+                                        <td></td>
+                                    </tr><tr>
+                                        <td>今月の平均滞在時間</td>
+                                        <td></td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                        
+                    <!-- <form id="month" class="monthly-search-form" action='' method='post'>
+                        {% csrf_token %}
+                        <div  class="monthly-search-box">
+                            <input type='text' name='year_search' placeholder="Year" id="year_search" />
+                            <input type='text' name='month_search' placeholder="Month" id="month_search" />
+                            <button type="submit" id="submit_btn"><i class="fa fa-search"></i></button>
+                        </div>
+                    </form> -->
+                {% endif %}
+              
+            </div>
+         </div>
+        
+    </div>
+
+<!-- グラフ描画スクリプト -->
+<script>
+    let lineCtx = document.getElementById("lineChart");
+    let lineCtx2 = document.getElementById("lineChart2");
+
+    var total = parseInt(document.getElementById('total-count').getAttribute('title'));
+    console.log('Total members:', total);
+
+    let namelist = [];
+    let totallist = [];
+    let entrylist = [];
+    let averagelist = [];
+
+    for (let i = 1; i <= total; i++) {
+        var name = document.getElementById(`name-${i}`).title;
+        // var mtt = parseInt(document.getElementById(`mtt-${i}`).getAttribute('title')) / 60;
+        var mtt = parseInt(document.getElementById(`mtt-${i}`).getAttribute('title'));
+        var mec = parseInt(document.getElementById(`mec-${i}`).getAttribute('title'));
+        // var adt = parseInt(document.getElementById(`adt-${i}`).getAttribute('title')) / 60;
+        var adt = parseInt(document.getElementById(`adt-${i}`).getAttribute('title'));
+        namelist.push(name);
+        totallist.push(mtt);
+        entrylist.push(mec);
+        averagelist.push(adt);
+    }
+
+    let lineConfig = {
+        data: {
+            labels: namelist,
+            datasets: [
+            { 
+                type: 'line',
+                label: '滞在日数',
+                unit: 'days',
+                data: entrylist,
+                backgroundColor: '#add8e6',
+                borderColor: '#add8e6',
+                hoverBackgroundColor: '#87ceeb',
+                hoverBorderColor: '#87ceeb',
+                yAxisID: 'y-axis-days',
+            }, 
+            {
+                type: 'bar',
+                label: '平均滞在時間',
+                unit: 'hours',
+                data: averagelist,
+                backgroundColor: '#66cdaa',
+                borderColor: '#66cdaa',
+                hoverBackgroundColor: '#20b2aa',
+                hoverBorderColor: '#20b2aa',
+                yAxisID: 'y-axis-hours',
+            }],
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    suggestedMin: 0,
+                    ticks: {
+                        stepSize: 10,
+                    }
+                },
+                'y-axis-hours': {
+                    beginAtZero: true,
+                    position: 'left',
+                    ticks: {
+                        stepSize: 1,
+                    },
+                    grid: {
+                        drawBorder: true,
+                        lineWidth: 1,
+                    },
+                    title: {
+                        display: true,
+                        text: '平均滞在時間 (hours)'
+                    }
+                },
+                'y-axis-days': {
+                    beginAtZero: true,
+                    position: 'right',
+                    ticks: {
+                        stepSize: 1,
+                    },
+                    grid: {
+                        drawBorder: false,
+                        lineWidth: 1,
+                    },
+                    title: {
+                        display: true,
+                        text: '滞在日数 (days)'
+                    }
+                }
+            },
+            animation: {
+                duration: 2000,
+                easing: 'easeOutBounce'
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: '滞在状況',
+                    font: {
+                        size: 18,
+                    },
+                    color: '#333'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += context.raw + ' ' + context.dataset.unit ;
+                            return label;
+                        }
+                    }
+                }
+            }
+        },
+    };
+
+    let lineConfig2 = {
+        type: 'bar',
+        data: {
+            labels: namelist,
+            datasets: [{
+                label: '累計滞在時間',
+                data: totallist,
+            }],
+        },
+        options: {
+            plugins: {
+                title: {
+                    display: true,
+                    text: '累計滞在時間',
+                    font: {
+                        size: 18,
+                    },
+                    color: '#333'
+                },
+            }
+        }
+    }
+
+    let lineChart = new Chart(lineCtx, lineConfig);
+    let lineChart2 = new Chart(lineCtx2, lineConfig2);
+</script>
+
+<script src="{% static 'roomstatus.js' %}"></script>
+</body>
+</html>
