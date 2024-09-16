@@ -2,3 +2,6 @@ db.sqlite3
 *.otf
 *.ttf
 
+labstatus/__pycache__/
+labstatus/migrations/
+RoomStatus/__pycache__/
